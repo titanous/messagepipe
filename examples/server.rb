@@ -19,6 +19,11 @@ class TestServer < MessagePipeServer
     raise StandardError, 'hell'
   end
 
+  def slow
+    sleep 1
+    'hi'
+  end
+
   private
 
   def private_method

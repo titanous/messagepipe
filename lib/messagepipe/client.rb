@@ -13,7 +13,7 @@ class TcpTransport
   end
 
   def write(data)
-    @socket.print(data)
+    @socket.print(data.to_msgpack)
   end
 
   def open?
@@ -35,7 +35,7 @@ class MessagePipe
   end
 
   def call(method, *args)
-    @transport.write([REQUEST, seqid, method, args].to_msgpack)
+    @transport.write([REQUEST, seqid, method, args])
 
     while @transport.open?
       @unpacker.feed(@transport.read)
@@ -45,18 +45,20 @@ class MessagePipe
     raise RemoteError, 'disconnected'
   end
 
+  def call_async(method, *args)
+    @transport.write_async([REQUEST, seqid, method, args]) { |msg| yield process_msg(msg) }
+  end
+
   private
 
   def process_msg(msg)
-    raise RemoteError, "invalid sequence id" unless msg[1] == @seqid
-
     # message format: [type, seqid, error_object, result_object]
     if !msg[2] && msg[0] == RESPONSE
       return msg[3]
     elsif msg[2]
       raise RemoteError, msg[2]
     else
-      raise RemoteError, "recieved invalid message: #{msg.inspect}"
+      raise RemoteError, "received invalid message: #{msg.inspect}"
     end
   end
 
