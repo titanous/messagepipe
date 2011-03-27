@@ -5,9 +5,8 @@ require 'benchmark'
 
 # Server that receives MessagePack RPC
 class MessagePipeServer < EventMachine::Connection
-  CMD_CALL = 0x01
-  RET_OK   = 0x02
-  RET_E    = 0x03
+  REQUEST  = 0x00
+  RESPONSE = 0x01
 
   protected
 
@@ -19,33 +18,34 @@ class MessagePipeServer < EventMachine::Connection
     pac.feed(data)
     pac.each do |msg|
       begin
-
         response = nil
 
         secs = Benchmark.realtime do
+          type  = msg[0]
+          seqid = msg[1]
+
+          if type != REQUEST
+            unbind
+            raise 'Bad client'
+          end
+
+          # message format: [type, seqid, error_object, result_object]
           response = begin
-            [RET_OK, receive_object(msg)]
+            [RESPONSE, seqid, nil, receive_object(msg[2,2])]
           rescue => e
-            [RET_E, "#{e.class.name}: #{e.message}"]
+            [RESPONSE, seqid, "#{e.class.name}: #{e.message}", nil]
           end
         end
 
         send_data(response.to_msgpack)
 
-        puts "#{object_id} - #{msg[1]}(#{msg[2].length} args) - [%.4f ms] [#{response[0] == RET_OK ? 'ok' : 'error'}]" % [secs||0]
-
+        puts "#{object_id} - #{msg[1]} - #{msg[2]}(#{msg[3].length} args) - [%.4f ms] [#{response[2] ? 'error' : 'ok'}]" % [secs||0]
       end
     end
   end
 
   def receive_object(msg)
-    cmd, method, args = *msg
-
-    if cmd != CMD_CALL
-      unbind
-      raise 'Bad client'
-    end
-
+    method, args = *msg
 
     if method and public_methods.include?(method)
       return __send__(method, *args)
