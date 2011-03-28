@@ -34,7 +34,6 @@ pids = (0..4).collect do
 
     puts "benchmark finished in #{ms}s"
     exit 0
-
   end
 end
 

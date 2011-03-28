@@ -17,30 +17,28 @@ class MessagePipeServer < EventMachine::Connection
   def receive_data(data)
     pac.feed(data)
     pac.each do |msg|
-      begin
-        response = nil
+      response = nil
 
-        secs = Benchmark.realtime do
-          type  = msg[0]
-          seqid = msg[1]
+      secs = Benchmark.realtime do
+        type  = msg[0]
+        seqid = msg[1]
 
-          if type != REQUEST
-            unbind
-            raise 'Bad client'
-          end
-
-          # message format: [type, seqid, error_object, result_object]
-          response = begin
-            [RESPONSE, seqid, nil, receive_object(msg[2,2])]
-          rescue => e
-            [RESPONSE, seqid, "#{e.class.name}: #{e.message}", nil]
-          end
+        if type != REQUEST
+          unbind
+          raise 'Bad client'
         end
 
-        send_data(response.to_msgpack)
-
-        puts "#{object_id} - #{msg[1]} - #{msg[2]}(#{msg[3].length} args) - [%.4f ms] [#{response[2] ? 'error' : 'ok'}]" % [secs||0]
+        # message format: [type, seqid, error_object, result_object]
+        response = begin
+          [RESPONSE, seqid, nil, receive_object(msg[2,2])]
+        rescue => e
+          [RESPONSE, seqid, "#{e.class.name}: #{e.message}", nil]
+        end
       end
+
+      send_data(response.to_msgpack)
+
+      puts "#{object_id} - #{msg[1]} - #{msg[2]}(#{msg[3].length} args) - [%.4f ms] [#{response[2] ? 'error' : 'ok'}]" % [secs||0]
     end
   end
 
